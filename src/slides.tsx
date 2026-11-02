@@ -3,6 +3,7 @@ import { GitHubSlide } from "./slides/GitHubSlide"
 import { IterationSlide } from "./slides/IterationSlide"
 import { FeedbackSlide } from "./slides/FeedbackSlide"
 import { SuccessMetricsSlide } from "./slides/SuccessMetricsSlide"
+import { OkrSlide } from "./slides/OkrSlide"
 import { DashboardSlide } from "./slides/DashboardSlide"
 import { VisionSlide } from "./slides/VisionSlide"
 
@@ -13,5 +14,6 @@ export const slides: { id: string; seconds: number; render: () => ReactNode }[] 
   { id: "iteration", seconds: 25, render: () => <IterationSlide /> },
   { id: "feedback", seconds: 25, render: () => <FeedbackSlide /> },
   { id: "success", seconds: 20, render: () => <SuccessMetricsSlide /> },
+  { id: "okrs", seconds: 20, render: () => <OkrSlide /> },
   { id: "dashboard", seconds: 25, render: () => <DashboardSlide /> },
 ]

@@ -248,6 +248,101 @@ const loadFeedback = () =>
     }
   })
 
+// --- Digital Team OKRs (SharePoint workbook, read via Microsoft Graph) ---
+// App-only token for Graph. Needs the Graph application permission Sites.Selected, granted
+// (read) on the DigitalTeams site only. See README.
+let graphTok = { value: null, expiresAt: 0 }
+async function graphToken() {
+  if (graphTok.value && Date.now() < graphTok.expiresAt - 60_000) return graphTok.value
+  const { ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET } = process.env
+  if (!ENTRA_TENANT_ID || !ENTRA_CLIENT_ID || !ENTRA_CLIENT_SECRET) {
+    throw new Error("OKR_MODE=live needs ENTRA_TENANT_ID, ENTRA_CLIENT_ID and ENTRA_CLIENT_SECRET")
+  }
+  const res = await fetch(`https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token`, {
+    method: "POST",
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: ENTRA_CLIENT_ID,
+      client_secret: ENTRA_CLIENT_SECRET,
+      scope: "https://graph.microsoft.com/.default",
+    }),
+  })
+  if (!res.ok) throw new Error(`Graph token request failed (${res.status})`)
+  const json = await res.json()
+  graphTok = { value: json.access_token, expiresAt: Date.now() + json.expires_in * 1000 }
+  return graphTok.value
+}
+
+async function graph(path) {
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
+    headers: { authorization: `Bearer ${await graphToken()}` },
+  })
+  if (!res.ok) throw new Error(`Graph ${path.split("?")[0]} failed (${res.status})`)
+  return res.json()
+}
+
+// Excel serial date -> YYYY-MM-DD (UTC, so no timezone drift).
+const serialToIso = (n) => new Date(Math.round((n - 25569) * 864e5)).toISOString().slice(0, 10)
+
+// Same rule as the sheet's helper column: overdue > due within 60 days > complete > pending.
+function okrHealth(target, status) {
+  const today = new Date().toISOString().slice(0, 10)
+  const soon = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10)
+  if (status === "Complete") return "complete"
+  if (target && target < today) return "overdue"
+  if (target && target < soon) return "nearly"
+  return "pending"
+}
+
+// Rows from the sheet: [problem name, statement, key result, target date, status, completed date].
+// Problem name/statement are merged cells, so only the first row of each group has them.
+function groupOkrRows(rows) {
+  const groups = []
+  for (const [name, statement, result, target, status, completed] of rows) {
+    if (!String(result ?? "").trim()) continue
+    if (String(name ?? "").trim() || !groups.length) {
+      groups.push({ name: String(name ?? "").trim(), statement: String(statement ?? "").trim(), results: [] })
+    }
+    const t = typeof target === "number" ? serialToIso(target) : target || null
+    const st = String(status ?? "").trim()
+    groups.at(-1).results.push({
+      text: String(result).trim(),
+      target: t,
+      status: st,
+      completed: typeof completed === "number" ? serialToIso(completed) : completed || null,
+      health: okrHealth(t, st),
+    })
+  }
+  return groups
+}
+
+const loadOkrs = () =>
+  cached("okrs", async () => {
+    if (process.env.OKR_MODE === "live") {
+      const host = process.env.OKR_SITE_HOST ?? "relationshipsaustraliawa.sharepoint.com"
+      const sitePath = process.env.OKR_SITE_PATH ?? "/sites/DigitalTeams"
+      const file = process.env.OKR_FILE_PATH ?? "General/Digital Team Objectives and Key Results.xlsx"
+      const sheet = process.env.OKR_SHEET ?? "Danjoo Success metrics"
+      const site = await graph(`/sites/${host}:${sitePath}?$select=id`)
+      const enc = (v) => encodeURIComponent(v).replace(/%2F/g, "/")
+      const range = await graph(
+        `/sites/${site.id}/drive/root:/${enc(file)}:/workbook/worksheets('${encodeURIComponent(sheet)}')/range(address='A4:F80')?$select=values`,
+      )
+      return { mock: false, groups: groupOkrRows(range.values), updatedAt: new Date().toISOString() }
+    }
+    const d = (offset) => new Date(Date.now() + offset * 864e5).toISOString().slice(0, 10)
+    const rows = [
+      ["Feedback", "Sample.", "15% of clients provide feedback through the new system", d(40), "In Progress", null],
+      [null, null, "Contractual DEX feeds are not broken", d(40), "Complete", d(-3)],
+      [null, null, "Deprecate Feedback PDF Forms", d(-5), "In Progress", null],
+      [null, null, "We collect feedback earlier in the client journey (as well as at the end of service)", d(40), "In Progress", null],
+      [null, null, "Feedback responses automatically provided to practitioners associated with the session", d(40), "In Progress", null],
+      ["Session Notes", "Sample.", "A practitioner can review a case in a single view", d(110), "In Progress", null],
+      [null, null, "Practitioner happiness with the system: target 75% or more", d(110), "Not Started", null],
+    ]
+    return { mock: true, groups: groupOkrRows(rows), updatedAt: new Date().toISOString() }
+  })
+
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" }
 
 http
@@ -259,7 +354,7 @@ http
         res.writeHead(200, { "content-type": "text/plain" }).end("ok")
         return
       }
-      const loaders = { "/api/github": loadGithub, "/api/feedback": loadFeedback, "/api/iteration": loadIteration, "/api/delivery": loadDelivery }
+      const loaders = { "/api/github": loadGithub, "/api/feedback": loadFeedback, "/api/iteration": loadIteration, "/api/delivery": loadDelivery, "/api/okrs": loadOkrs }
       if (loaders[url.pathname]) {
         const data = await loaders[url.pathname]()
         res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(data))

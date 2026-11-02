@@ -89,3 +89,18 @@ h2 { margin: 0 0 2vh; font-weight: var(--fw-semibold); font-size: clamp(20px, 1.
 /* Last-updated indicator: small and quiet; turns golden when the board is offline. */
 .updated { position: fixed; right: 2vw; bottom: 1.2vh; font-size: 0.9vw; opacity: 0.55; }
 .updated.stale { opacity: 1; color: var(--rawa-warning); }
+
+/* OKR slide */
+
+.okr-bar { display: flex; margin: 2vh 0; }
+
+.okr-bar > div { transition: none; }
+
+.dot { display: inline-block; width: 1.1vh; height: 1.1vh; border-radius: 50%; margin-right: 0.8vw; }
+.okr-part { font-weight: var(--fw-medium); }
+.okr-table { flex: 1; min-height: 0; display: flex; flex-direction: column; font-size: clamp(16px, 1.4vw, 32px); }
+.okr-row { flex: 1; display: grid; grid-template-columns: 1fr 13vw 14vw; gap: 2vw; align-items: center; border-bottom: 1px solid var(--divider); min-height: 0; }
+.okr-row:last-child { border-bottom: 0; }
+.okr-head { flex: none; padding-bottom: 1.2vh; font-size: 0.8em; font-weight: var(--fw-extrabold); text-transform: uppercase; letter-spacing: var(--tracking-tag); color: var(--fg-on-surface-muted); }
+.okr-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-line; color: var(--fg-on-surface); font-weight: var(--fw-semibold); }
+.okr-health { display: flex; align-items: center; font-weight: var(--fw-semibold); color: var(--fg-on-surface); }

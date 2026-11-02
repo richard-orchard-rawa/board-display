@@ -77,6 +77,7 @@ Deploys come from GitHub Actions on every push to `main`
   | `FEEDBACK_MODE` | `mock` or `live` |
   | `FEEDBACK_BASE_URL`, `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID`, `FEEDBACK_API_SCOPE` | Needed for `live` |
   | `ENTRA_CLIENT_SECRET` | **Secret.** Needed for `live` |
+  | `OKR_MODE` | `mock` or `live`. Live reads the "Danjoo Success metrics" sheet of the Digital Team OKR workbook in SharePoint via Microsoft Graph, using the same Entra app. Needs Graph application permission `Sites.Selected` with read granted on the DigitalTeams site only. `OKR_SITE_HOST`, `OKR_SITE_PATH`, `OKR_FILE_PATH`, `OKR_SHEET` override the defaults. |
 
 - **Health check:** set Monitoring > Health check path to `/healthz`. It returns `200 ok` without
   calling any upstream API, so a GitHub or feedback outage doesn't mark the app unhealthy.
