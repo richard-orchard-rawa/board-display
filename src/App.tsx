@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { slides } from "./slides"
-import { useLastFresh } from "./useApi"
+import { PAGE_SECONDS, okrPages, type Okrs } from "./slides/okrPages"
+import { useApi, useLastFresh } from "./useApi"
 import logo from "./brand/rawa-wordmark-white.svg"
 
 const STALE_AFTER_MS = 5 * 60 * 1000
@@ -25,11 +26,14 @@ function LastUpdated() {
 export function App() {
   const [i, setI] = useState(0)
   const slide = slides[i]
+  // The OKR slide stays up long enough to show every page of key results.
+  const okrs = useApi<Okrs>("/api/okrs").data
+  const seconds = slide.id === "okrs" && okrs ? Math.max(okrPages(okrs).length, 1) * PAGE_SECONDS : slide.seconds
 
   useEffect(() => {
-    const id = setTimeout(() => setI((n) => (n + 1) % slides.length), slide.seconds * 1000)
+    const id = setTimeout(() => setI((n) => (n + 1) % slides.length), seconds * 1000)
     return () => clearTimeout(id)
-  }, [i, slide.seconds])
+  }, [i, seconds])
 
   // Arrow keys step through slides; the auto-advance timer restarts on each change.
   useEffect(() => {
@@ -54,7 +58,7 @@ export function App() {
       <main key={slide.id} className="slide">
         {slide.render()}
       </main>
-      <div className="progress" key={`p-${slide.id}`} style={{ animationDuration: `${slide.seconds}s` }} />
+      <div className="progress" key={`p-${slide.id}`} style={{ animationDuration: `${seconds}s` }} />
       <LastUpdated />
     </div>
   )
