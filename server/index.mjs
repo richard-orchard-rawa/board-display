@@ -72,7 +72,43 @@ const ITEMS_QUERY = `query($org:String!, $number:Int!, $after:String) {
   } }
 }`
 
-// One paginated fetch of every project item, shared by the iteration and delivery endpoints.
+// projectV2.items leaves out archived items, and the project auto-archives
+// finished work, so older iterations would read as empty. Issues and PRs can
+// list their project items with archived ones included, so find those via
+// search. Archived draft items can't be reached this way. Search stops at 1,000 results.
+const ARCHIVED_QUERY = `query($q:String!, $after:String) {
+  search(type:ISSUE, query:$q, first:100, after:$after) {
+    pageInfo { hasNextPage endCursor }
+    nodes {
+      ... on Issue { projectItems(first:10, includeArchived:true) { nodes { ...item } } }
+      ... on PullRequest { projectItems(first:10, includeArchived:true) { nodes { ...item } } }
+    }
+  }
+}
+fragment item on ProjectV2Item {
+  isArchived
+  project { number owner { ... on Organization { login } } }
+  status: fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+  iteration: fieldValueByName(name:"Iteration") { ... on ProjectV2ItemFieldIterationValue { title } }
+}`
+
+const loadArchivedItems = async () => {
+  const items = []
+  let after = null
+  do {
+    const { search } = await ghGraphql(ARCHIVED_QUERY, { q: `project:${PROJECT_ORG}/${PROJECT_NUMBER}`, after })
+    for (const node of search.nodes) {
+      for (const item of node.projectItems?.nodes ?? []) {
+        // Only archived ones: the rest already come from projectV2.items.
+        if (item.isArchived && item.project.number === PROJECT_NUMBER && item.project.owner?.login === PROJECT_ORG) items.push(item)
+      }
+    }
+    after = search.pageInfo.hasNextPage ? search.pageInfo.endCursor : null
+  } while (after)
+  return items
+}
+
+// One paginated fetch of every project item (archived included), shared by the iteration and delivery endpoints.
 const loadProject = () =>
   cached("project", async () => {
     let after = null
@@ -85,6 +121,7 @@ const loadProject = () =>
       items.push(...project.items.nodes)
       after = project.items.pageInfo.hasNextPage ? project.items.pageInfo.endCursor : null
     } while (after)
+    items.push(...(await loadArchivedItems()))
     return { iterations, items }
   })
 
