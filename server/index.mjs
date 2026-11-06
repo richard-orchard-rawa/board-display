@@ -108,6 +108,31 @@ const loadArchivedItems = async () => {
   return items
 }
 
+// The archived search is the slow part and archived items are finished work, so
+// keep it for hours rather than minutes. Once loaded, a stale copy keeps being
+// served while a fresh one loads in the background, so the TV never waits on it.
+// An item archived since the last refresh is left out until the next one.
+const ARCHIVED_TTL_MS = 4 * 60 * 60 * 1000
+let archived = { at: -Infinity, value: null, pending: null }
+function archivedItems() {
+  if (Date.now() - archived.at >= ARCHIVED_TTL_MS && !archived.pending) {
+    // Never rejects (an unhandled rejection would kill the server); resolves to the error instead.
+    archived.pending = loadArchivedItems().then(
+      (value) => { archived = { at: Date.now(), value, pending: null } },
+      (err) => {
+        archived.pending = null
+        console.error(`Archived items load failed: ${err.message}`)
+        return err
+      },
+    )
+  }
+  if (archived.value) return archived.value
+  return archived.pending.then((err) => {
+    if (err) throw err
+    return archived.value
+  })
+}
+
 // One paginated fetch of every project item (archived included), shared by the iteration and delivery endpoints.
 const loadProject = () =>
   cached("project", async () => {
@@ -121,7 +146,7 @@ const loadProject = () =>
       items.push(...project.items.nodes)
       after = project.items.pageInfo.hasNextPage ? project.items.pageInfo.endCursor : null
     } while (after)
-    items.push(...(await loadArchivedItems()))
+    items.push(...(await archivedItems()))
     return { iterations, items }
   })
 
@@ -408,4 +433,8 @@ http
       res.writeHead(isApi ? 502 : 404).end(isApi ? String(err.message) : "Not found")
     }
   })
-  .listen(PORT, () => console.log(`board-display on http://localhost:${PORT}`))
+  .listen(PORT, () => {
+    console.log(`board-display on http://localhost:${PORT}`)
+    // Warm the slow archived search so the first chart load doesn't wait on it.
+    if (process.env.GITHUB_TOKEN) Promise.resolve(archivedItems()).catch(() => {}) // already logged
+  })
