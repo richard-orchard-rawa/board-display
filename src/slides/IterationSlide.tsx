@@ -4,6 +4,7 @@ interface Iteration {
   iteration: { title: string; startDate: string; endDate: string; dayNumber: number; totalDays: number } | null
   counts: { name: string; count: number }[]
   total: number
+  features: { done: number; total: number }
 }
 
 const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString("en-AU", { day: "numeric", month: "short" })
@@ -13,7 +14,7 @@ export function IterationSlide() {
   if (!data) return <h1>{error ? "Iteration data is unavailable." : "Loading."}</h1>
   if (!data.iteration) return <h1>No iteration is running at the moment.</h1>
 
-  const { iteration, counts, total } = data
+  const { iteration, counts, total, features } = data
   const done = counts.find((c) => c.name === "Done")?.count ?? 0
   const pct = total ? Math.round((done / total) * 100) : 0
   return (
@@ -36,6 +37,10 @@ export function IterationSlide() {
       <section className="card">
         <h2>{pct}% done · {done} of {total} items</h2>
         <div className="bar"><div style={{ width: `${pct}%` }} /></div>
+        <div className="dim feat-line">
+          <i className="sw feat" />
+          {features.done} of {features.total} {features.total === 1 ? "feature" : "features"} done
+        </div>
       </section>
     </>
   )

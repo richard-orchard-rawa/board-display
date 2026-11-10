@@ -6,7 +6,7 @@ interface Fb {
   daily?: { date: string; count: number }[]
 }
 interface Delivery {
-  iterations: { title: string; startDate: string; done: number; total: number; current: boolean }[]
+  iterations: { title: string; startDate: string; done: number; featuresDone: number; total: number; current: boolean }[]
 }
 
 export function DashboardSlide() {
@@ -38,11 +38,18 @@ export function DashboardSlide() {
           <div className="dim sub">
             {iterations.length ? "Latest iteration still in progress" : dl.error ? "Unavailable." : "Loading."}
           </div>
+          {iterations.length > 0 && (
+            <div className="legend">
+              <span><i className="sw all" />All items</span>
+              <span><i className="sw feat" />Features</span>
+            </div>
+          )}
           <BarChart
             showValues
             bars={iterations.map((it) => ({
               key: it.title,
               value: it.done,
+              sub: it.featuresDone,
               label: it.title.replace(/^Iteration\s*/i, "#"),
               highlight: it.current,
             }))}
