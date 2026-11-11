@@ -67,10 +67,15 @@ const ITEMS_QUERY = `query($org:String!, $number:Int!, $after:String) {
       nodes {
         status: fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
         iteration: fieldValueByName(name:"Iteration") { ... on ProjectV2ItemFieldIterationValue { title } }
+        content { ... on Issue { labels(first:20) { nodes { name } } } ... on PullRequest { labels(first:20) { nodes { name } } } }
       }
     }
   } }
 }`
+
+// Feature work is marked with the "feature" label on the issue or PR (draft items have no labels).
+const isFeature = (item) => item.content?.labels?.nodes.some((l) => l.name.toLowerCase() === "feature") ?? false
+const isDone = (item) => item.status?.name === "Done"
 
 // projectV2.items leaves out archived items, and the project auto-archives
 // finished work, so older iterations would read as empty. Issues and PRs can
@@ -90,6 +95,7 @@ fragment item on ProjectV2Item {
   project { number owner { ... on Organization { login } } }
   status: fieldValueByName(name:"Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
   iteration: fieldValueByName(name:"Iteration") { ... on ProjectV2ItemFieldIterationValue { title } }
+  content { ... on Issue { labels(first:20) { nodes { name } } } ... on PullRequest { labels(first:20) { nodes { name } } } }
 }`
 
 const loadArchivedItems = async () => {
@@ -163,7 +169,8 @@ const loadDelivery = () =>
         return {
           title: it.title,
           startDate: it.startDate,
-          done: mine.filter((i) => i.status?.name === "Done").length,
+          done: mine.filter(isDone).length,
+          featuresDone: mine.filter((i) => isDone(i) && isFeature(i)).length,
           total: mine.length,
           current: it === started[started.length - 1],
         }
@@ -185,10 +192,15 @@ const loadIteration = () =>
     if (!current) return { iteration: null, updatedAt: new Date().toISOString() }
 
     const counts = Object.fromEntries(STATUSES.map((name) => [name, 0]))
+    const features = { done: 0, total: 0 }
     for (const item of items) {
       if (item.iteration?.title !== current.title) continue
       const name = item.status?.name ?? "Backlog"
       counts[name] = (counts[name] ?? 0) + 1
+      if (isFeature(item)) {
+        features.total++
+        if (isDone(item)) features.done++
+      }
     }
     const total = Object.values(counts).reduce((a, b) => a + b, 0)
     return {
@@ -201,6 +213,7 @@ const loadIteration = () =>
       },
       counts: STATUSES.map((name) => ({ name, count: counts[name] })),
       total,
+      features,
       updatedAt: new Date().toISOString(),
     }
   })

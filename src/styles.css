@@ -79,6 +79,16 @@ h2 { margin: 0 0 2vh; font-weight: var(--fw-semibold); font-size: clamp(20px, 1.
 .chart .stem { flex: 1; width: 100%; display: flex; align-items: flex-end; }
 .chart .fill { width: 100%; background: var(--rawa-navy); border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 2px; }
 .chart .fill.hi { background: var(--rawa-dark-teal); }
+/* Feature work: a peach segment at the base of each bar, with its count in a matching pill. */
+.chart .fill { display: flex; align-items: flex-end; overflow: hidden; }
+.chart .sub { width: 100%; min-height: 2px; background: var(--rawa-peach); }
+.chart .sub-val { margin-left: 0.4vw; padding: 0 0.5vw; border-radius: var(--r-pill); background: var(--rawa-peach); color: var(--rawa-navy-deep); font-size: 0.8em; }
+.legend { display: flex; gap: 1.5vw; margin-top: 1vh; font-size: clamp(12px, 1.1vw, 24px); color: var(--fg-on-surface-muted); }
+.legend span { display: inline-flex; align-items: center; }
+.sw { display: inline-block; width: 1em; height: 1em; margin-right: 0.4em; border-radius: var(--r-xs); vertical-align: -0.1em; }
+.sw.all { background: var(--rawa-navy); }
+.sw.feat { background: var(--rawa-peach); }
+.feat-line { margin-top: 1.5vh; font-size: clamp(16px, 1.4vw, 32px); }
 .chart .val { font-size: clamp(16px, 1.5vw, 34px); font-weight: var(--fw-bold); color: var(--fg-on-surface); margin-bottom: 0.5vh; }
 .chart .lbl { margin-top: 1vh; height: 2.4vh; font-size: clamp(12px, 1.1vw, 24px); color: var(--fg-on-surface-muted); white-space: nowrap; }
 

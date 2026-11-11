@@ -3,6 +3,8 @@ export interface Bar {
   value: number
   label?: string
   highlight?: boolean
+  // A part of the bar (never more than value), drawn over its base in the feature colour.
+  sub?: number
 }
 
 // Round the top of the axis up to a tidy number with at most 4 steps (0, 10, 20, 30).
@@ -38,9 +40,16 @@ export function BarChart({ bars, showValues }: { bars: Bar[]; showValues: boolea
         <div className={`chart ${showValues ? "" : "dense"}`} role="img">
           {bars.map((b) => (
             <div key={b.key} className="col">
-              {showValues && <span className="val">{b.value}</span>}
+              {showValues && (
+                <span className="val">
+                  {b.value}
+                  {b.sub !== undefined && <span className="sub-val">{b.sub}</span>}
+                </span>
+              )}
               <div className="stem">
-                <div className={`fill ${b.highlight ? "hi" : ""}`} style={{ height: `${(b.value / top) * 100}%` }} />
+                <div className={`fill ${b.highlight ? "hi" : ""}`} style={{ height: `${(b.value / top) * 100}%` }}>
+                  {!!b.sub && <div className="sub" style={{ height: `${(Math.min(b.sub, b.value) / Math.max(1, b.value)) * 100}%` }} />}
+                </div>
               </div>
               <span className="lbl">{b.label ?? ""}</span>
             </div>
