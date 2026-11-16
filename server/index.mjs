@@ -9,22 +9,33 @@ const PORT = Number(process.env.PORT ?? 3001)
 const REPO = process.env.GITHUB_REPO ?? "Relationships-Australia-WA/feedback"
 const PROJECT_ORG = process.env.PROJECT_ORG ?? "Relationships-Australia-WA"
 const PROJECT_NUMBER = Number(process.env.PROJECT_NUMBER ?? 1)
-const TTL_MS = 2 * 60 * 1000
+// How often cached data is refreshed (in the background; requests never wait on it).
+const TTL_MS = 60 * 60 * 1000
 const DIST = fileURLToPath(new URL("../dist", import.meta.url))
 
+// Stale-while-revalidate: once a key has loaded, requests are always answered
+// from memory; an expired entry is refreshed in the background so the TV never
+// waits on an upstream API. Only the very first load of a key blocks, and
+// concurrent requests share one in-flight load.
 const cache = new Map()
-async function cached(key, load) {
-  const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.value
-  try {
-    const value = await load()
-    cache.set(key, { at: Date.now(), value })
-    return value
-  } catch (err) {
-    // Serve stale data rather than blanking the TV on a transient failure.
-    if (hit) return hit.value
-    throw err
+function cached(key, load) {
+  const entry = cache.get(key) ?? { at: -Infinity, value: undefined, pending: null }
+  cache.set(key, entry)
+  if (Date.now() - entry.at >= TTL_MS && !entry.pending) {
+    entry.pending = load().then(
+      (value) => {
+        Object.assign(entry, { at: Date.now(), value, pending: null })
+        return value
+      },
+      (err) => {
+        entry.pending = null
+        throw err
+      },
+    )
+    // A background refresh that fails keeps serving the old value; don't crash on it.
+    if (entry.value !== undefined) entry.pending.catch((err) => console.error(`Refresh of ${key} failed: ${err.message}`))
   }
+  return entry.value !== undefined ? Promise.resolve(entry.value) : entry.pending
 }
 
 async function gh(path) {
@@ -448,6 +459,8 @@ http
   })
   .listen(PORT, () => {
     console.log(`board-display on http://localhost:${PORT}`)
-    // Warm the slow archived search so the first chart load doesn't wait on it.
-    if (process.env.GITHUB_TOKEN) Promise.resolve(archivedItems()).catch(() => {}) // already logged
+    // Warm the project data (including the slow archived search) so the first chart load doesn't wait on it.
+    if (process.env.GITHUB_TOKEN) {
+      for (const load of [loadDelivery, loadIteration]) load().catch((err) => console.error(`Warm-up failed: ${err.message}`))
+    }
   })
