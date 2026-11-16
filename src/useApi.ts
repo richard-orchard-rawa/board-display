@@ -29,10 +29,14 @@ export function useLastFresh() {
   )
 }
 
+// Last good response per path, so a slide that remounts on its next turn in the
+// rotation draws its previous data at once instead of "Loading." while it refetches.
+const lastData = new Map<string, unknown>()
+
 // Polls an API endpoint; keeps the last good value if a refresh fails so the
 // TV never flashes an error for a transient blip.
 export function useApi<T>(path: string, everyMs = 60_000) {
-  const [data, setData] = useState<T | null>(null)
+  const [data, setData] = useState<T | null>(() => (lastData.get(path) as T | undefined) ?? null)
   const [error, setError] = useState(false)
   useEffect(() => {
     let alive = true
@@ -41,6 +45,7 @@ export function useApi<T>(path: string, everyMs = 60_000) {
         const res = await fetch(path)
         if (!res.ok) throw new Error(String(res.status))
         const json = (await res.json()) as T
+        lastData.set(path, json)
         if (alive) {
           setData(json)
           setError(false)
